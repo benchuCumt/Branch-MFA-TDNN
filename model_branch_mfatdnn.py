@@ -1,5 +1,3 @@
-
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -77,7 +75,7 @@ class Res2NetBlock(torch.nn.Module):
         assert in_channels % scale == 0
         assert out_channels % scale == 0
         self.dtype = dtype
-        in_channel = in_channels // scale  # 整除运算，表示一份中的通道数
+        in_channel = in_channels // scale  
         hidden_channel = out_channels // scale
         if self.dtype == 'Conv2D':
             self.blocks = nn.ModuleList(
@@ -85,7 +83,7 @@ class Res2NetBlock(torch.nn.Module):
                     Conv2D_Basic_Block(
                         in_channel, hidden_channel, kernel_size=(3,3), padding=(1,1), stride=(1,1)
                     )
-                    for i in range(scale - 1)  # 如果分成4份，则需要3个卷积层
+                    for i in range(scale - 1)  
                 ]
             )
         else:
@@ -100,14 +98,13 @@ class Res2NetBlock(torch.nn.Module):
         self.scale = scale
     def forward(self, x):
         y = []
-        for i, x_i in enumerate(torch.chunk(x, self.scale, dim=1)):  # chunk函数将输入沿着通道分割成scale份
+        for i, x_i in enumerate(torch.chunk(x, self.scale, dim=1)):  
             if i == 0:
                 y_i = x_i
             elif i == 1:
                 y_i = self.blocks[i - 1](x_i)
             else:
                 y_i = self.blocks[i - 1](x_i + y_i)
-            # 将输出放到一个数组中
             if self.dtype == 'TDNN':
                 y.append(y_i)
             else:
@@ -275,7 +272,7 @@ class Att_layer(torch.nn.Module):
             self,
             c_1st_conv,
             input_res2net_scale,
-            SE_neur=8,  # 压缩中间通道数
+            SE_neur=8,  
             sub_channel=160,
     ):
         super().__init__()
@@ -345,7 +342,7 @@ class Att_Block(torch.nn.Module):
             y = self.conv1D(y)
             if self.res:
                 x = torch.cat(x, dim=1)
-                y = y + x  # 残差连接
+                y = y + x  
         else:
             if self.res:
                 for i in range(len(x)):
@@ -453,7 +450,7 @@ class branch_mfatdnn(torch.nn.Module):
         self.time_attention = MutiScaleTimeAttention(time_att_choice=time_att_choice)
         self.res2conv2D = nn.Sequential(
             Res2NetBlock(c_1st_conv, c_1st_conv, scale=input_res2net_scale, dtype='Conv2D'),
-        )  # 3rd step. Multi-scale feature extraction，输出是一个数组y，如果是tdnn会进行cat
+        ) 
         self.freq_att_TDNN = nn.Sequential(
             Att_Block(
                 c_1st_conv,
@@ -466,7 +463,6 @@ class branch_mfatdnn(torch.nn.Module):
                 ),
         )  # 3rd step. Att-TDNN
 
-        # 用于融合两个分支的模块
         self.merge = merge(choice=merge_choice)
 
         # ----------------
@@ -524,12 +520,11 @@ class branch_mfatdnn(torch.nn.Module):
         x = self.first_conv(x)
         # batch_size 32 20 201
 
-        # 用于做时间注意力机制的分支
         branch = x
         branch = self.time_attention.forward(branch)
         # batch_size 32 20 201
 
-        residual = torch.flatten(x, 1, 2)  # 残差
+        residual = torch.flatten(x, 1, 2)  
         # batch_size 640 201
 
         x = self.res2conv2D(x)  # list: batch_size c_1st/scale*20 201
@@ -538,10 +533,8 @@ class branch_mfatdnn(torch.nn.Module):
         x = x.view(-1, 32, 20, x.size(-1))
         # batch_size 32 20 201
 
-        # 两个分支特征融合,先逐元素相乘再merge
         x = self.merge(branch, x)
         # batch_size 640 201
-        # 加上残差
         x = residual+x
 
         xl = []
@@ -555,7 +548,7 @@ class branch_mfatdnn(torch.nn.Module):
 
         # Multi-layer feature aggregation
         x = torch.cat(xl[0:], dim=1)
-        # batch_size 3072 202，全连接
+        # batch_size 3072 202
         x = self.mfa(x)
         # batch_size 3072 202
         # Attentive Statistical Pooling
