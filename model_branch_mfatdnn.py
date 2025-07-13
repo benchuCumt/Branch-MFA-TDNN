@@ -564,6 +564,3 @@ class branch_mfatdnn(torch.nn.Module):
         # print("x.shape5:")
         # print(x.shape)
         return x
-
-
-
